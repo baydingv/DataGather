@@ -2,15 +2,11 @@
 import scrapy
 from scrapy.http import HtmlResponse
 from jobparser.items import JobparserItem
-from pymongo import MongoClient
 
 class HhruSpider(scrapy.Spider):
     name = 'hhru'
     allowed_domains = ['hh.ru']
     start_urls = ['https://hh.ru/search/vacancy?text=Python&area=113&st=searchVacancy']
-    client = MongoClient('localhost', 27017)
-    db = client['less5']
-    coll = db.vacancy
 
     def parse(self, response: HtmlResponse):
         next_page = response.css('a.HH-Pager-Controls-Next::attr(href)').extract_first()
@@ -22,10 +18,12 @@ class HhruSpider(scrapy.Spider):
 
     def vacancy_parse (self, response: HtmlResponse):
         node_i = response.xpath('//div[@itemscope="itemscope"]')[0]  # разбираем отсюда
-#       link_i = node_i.xpath('./meta[@itemprop="url"]/@content')[0]
 
+#        print('node_i = ',node_i)
         link_lst = str(node_i.xpath('./meta[@itemprop="url"]/@content')[0]).split("'")
+        print('link_lst = ',link_lst)
         link = link_lst[3]
+        print('link = ', link)
 
         name  = node_i.xpath('.//h1[@class="header"]/text()').extract()[0]
         source_lst = link.split('/')
@@ -38,6 +36,6 @@ class HhruSpider(scrapy.Spider):
 #        print(link, '\n', name, '\n', salary, '\n', source)
 
 
-        rec = {'name': name, 'salary': salary, 'site': source, 'link': link}
-        self.coll.insert_one(rec)
+#        rec = {'name': name, 'salary': salary, 'site': source, 'link': link}
+#        self.coll.insert_one(rec)
         yield JobparserItem(name=name, salary=salary, site=source, link=link)
