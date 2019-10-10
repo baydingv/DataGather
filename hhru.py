@@ -1,41 +1,27 @@
-# -*- coding: utf-8 -*-
 import scrapy
-from scrapy.http import HtmlResponse
-from jobparser.items import JobparserItem
-
+from urllib.parse import urljoin
+from jobparser.items import XxruItem
 class HhruSpider(scrapy.Spider):
-    name = 'hhru'
-    allowed_domains = ['hh.ru']
-    start_urls = ['https://hh.ru/search/vacancy?text=Python&area=113&st=searchVacancy']
+    name = "hhru"
+    start_urls = ['https://chelyabinsk.hh.ru/search/vacancy?area=113&st=searchVacancy&text=Python']
 
-    def parse(self, response: HtmlResponse):
-        next_page = response.css('a.HH-Pager-Controls-Next::attr(href)').extract_first()
-        yield response.follow(next_page,callback=self.parse)
-        vacancy = response.css(
-            'div.vacancy-serp div.vacancy-serp-item div.vacancy-serp-item__row_header a.bloko-link::attr(href)').extract()
-        for link in vacancy:
-            yield response.follow(link,self.vacancy_parse) # по ссылке - на вакансию из списка, текст проги стоит далее
+    def parse(self, response):
+        tree = response.xpath('//div[@class ="vacancy-serp-item__info"]//a[@class="bloko-link HH-LinkModifier"]')
+        for vacancy in tree:
+            link_i = vacancy.xpath('./@href').get()
+            #print(link_i) # то же что и  urljoin(response.url,link_i)
+            yield response.follow(link_i, callback=self.parse_vacancy)
 
-    def vacancy_parse (self, response: HtmlResponse):
-        node_i = response.xpath('//div[@itemscope="itemscope"]')[0]  # разбираем отсюда
-
-#        print('node_i = ',node_i)
-        link_lst = str(node_i.xpath('./meta[@itemprop="url"]/@content')[0]).split("'")
-        print('link_lst = ',link_lst)
-        link = link_lst[3]
-        print('link = ', link)
-
-        name  = node_i.xpath('.//h1[@class="header"]/text()').extract()[0]
-        source_lst = link.split('/')
-        source = source_lst[2]
-        salary_lst = str(node_i.xpath('.//p[@class="vacancy-salary"]/text()')[0]).split("'")
-        salary = salary_lst[3]
-        salary = salary.replace('\\xa0', ' ')
-#        [print(x,ord(x)) for x in salary]
-#        salary = "".join([x for x in salary if ord(x) !=92 & ord(x)!=127])
-#        print(link, '\n', name, '\n', salary, '\n', source)
+        next_pages = response.xpath('//a[@class="bloko-button HH-Pager-Controls-Next HH-Pager-Control"]/@href').getall()
+        next_page = next_pages[-1]
+        url = urljoin(response.url, next_page)
+        yield response.follow(url, callback=self.parse)
 
 
-#        rec = {'name': name, 'salary': salary, 'site': source, 'link': link}
-#        self.coll.insert_one(rec)
-        yield JobparserItem(name=name, salary=salary, site=source, link=link)
+    def parse_vacancy(self, response):
+        my_source = 'chelyabinsk.hh.ru'
+        node_i = response.xpath('//div[@class="vacancy-title "]')
+        title_lst = node_i.xpath('./h1[@class="header"]/text()').extract()
+        salary_lst = node_i.xpath('.//p[@class="vacancy-salary"]/text()').extract()
+        link = response.url
+        yield XxruItem(title=title_lst, salary=salary_lst, link=link, source=my_source)

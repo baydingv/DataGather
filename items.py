@@ -8,11 +8,11 @@
 import scrapy
 
 
-class JobparserItem(scrapy.Item):
+class XxruItem(scrapy.Item):
     # define the fields for your item here like:
+    # name = scrapy.Field()
     _id    = scrapy.Field()
-    name   = scrapy.Field()
-    salary = scrapy.Field()
+    title  = scrapy.Field()
     link   = scrapy.Field()
-    site   = scrapy.Field()
-    pass
+    salary = scrapy.Field()
+    source = scrapy.Field()

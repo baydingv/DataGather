@@ -1,33 +1,31 @@
 # -*- coding: utf-8 -*-
 import scrapy
-from scrapy.http import HtmlResponse
-from jobparser.items import JobparserItem
+from urllib.parse import urljoin
+from jobparser.items import XxruItem
 
 
 class SjruSpider(scrapy.Spider):
     name = 'sjru'
-    allowed_domains = ['sj.ru']
-    start_urls = ['https://www.superjob.ru/vacancy/search/?keywords=Python&without_agencies=1&geo%5Bc%5D%5B0%5D=1&page=1']
+    allowed_domains = ['superjob.ru']
+    start_urls = ['https://www.superjob.ru/vacancy/search/?keywords=Python&geo%5Bc%5D%5B0%5D=1']
 
-    def parse(self, response: HtmlResponse):
-        node_i = response.xpath('//div[@style="display:block"]//a[@target="_blank"]')  # список нужных элементов
-        source = 'superjob.ru'
-        for en in node_i:
-            link_en = en.xpath('@href').get()
-            link = "".join(['http://',source,str(link_en)])
-            yield response.follow(link,self.vacancy_parse) # по ссылке - на вакансию из списка, текст проги стоит далее
+    def parse(self, response):
+        tree = response.xpath('//div[@style="display:block"]//a[@target="_blank"]')  # body
+        for vacancy in tree:
+            link_i = urljoin(response.url, vacancy.xpath('@href').get())
+            yield response.follow(link_i, callback=self.parse_vacancy)
+
+        next_pages = response.xpath('//div[@class ="L1p51"]//a[@target="_self"]/@href').getall()
+        next_page = next_pages[-1]
+        url = urljoin(response.url, next_page)
+        yield response.follow(url, callback=self.parse)
+
+    def parse_vacancy(self, response):
+        my_source = "www.superjob.ru"
+        link       = response.url
+        title_lst  = response.xpath('//h1[@class]/text()').extract()
+        salary_lst = response.xpath('//h1[@class]/following-sibling::span').extract()
+#        print('SjruSpider: salary_lst=',salary_lst)
+        yield XxruItem(title=title_lst, salary=salary_lst, link=link, source=my_source)
 
 
-    def vacancy_parse (self, response: HtmlResponse):
-        print('------------- in vacancy_parse --------------')
-        name_path = response.xpath('.//h1[@class]').get()
-        name = name_path.xpath('./text()').get()
-        print("name = ",name)
-        salary_path = name_path.xpath('./following-sibling::span').get()
-        salary_base = salary_path.xpath('./text()').get()
-        salary = salary_base
-        salary_add_path = salary_path.xpath('./child::span')
-        for sal_en in salary_add_path:
-            salary = " ".join([salary,sal_en.xpath('./text()')[0] ])
-
-        yield JobparserItem(name=name, salary=salary, site=source, link=link)
